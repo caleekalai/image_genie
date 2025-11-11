@@ -1,31 +1,30 @@
 
-import { GoogleGenAI } from "@google/genai";
-
 export const generateImage = async (prompt: string): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
-  }
-  
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '1:1',
-        },
+    const response = await fetch('/api/generateImage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image?.imageBytes) {
-      const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-      return `data:image/jpeg;base64,${base64ImageBytes}`;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'An unexpected server error occurred.' }));
+      throw new Error(errorData.error || `Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.imageUrl) {
+      return data.imageUrl;
     } else {
-      throw new Error("Image generation failed: No image data received.");
+      throw new Error("Image generation failed: No image URL received from server.");
     }
   } catch (error) {
-    console.error("Error generating image with Gemini:", error);
-    throw new Error("Failed to generate image. The model may have refused the prompt. Please try a different prompt.");
+    console.error("Error calling generation service:", error);
+    if (error instanceof Error) {
+        throw error;
+    }
+    throw new Error("An unknown error occurred while generating the image.");
   }
 };
